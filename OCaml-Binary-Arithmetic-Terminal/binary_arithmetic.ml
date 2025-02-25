@@ -1,274 +1,231 @@
+(****************************************************************)
+(*                        BINARY HELPERS                        *)
+(****************************************************************)
+
 (**
-   A simple 8-bit “CPU Operations” Calculator in OCaml.
-   Demonstrates:
-   - Signed 8-bit arithmetic (Addition, Subtraction)
-   - Unsigned 8-bit logical ops (AND, OR, XOR, NOT)
-   - Binary representation as lists of 0/1
-   - Input parsing from terminal
-   - Output formatting in decimal or hex
-   - Recursion instead of loops
+  int_to_signed_binary: Convert an integer in [-128..127]
+  into an 8-bit two’s complement representation as a list of bits,
+  in MSB-first order.
+  
+  Example:
+    5   -> 00000101 → [0;0;0;0;0;1;0;1]
+    -3  -> 11111101 → [1;1;1;1;1;1;0;1]
 *)
+let int_to_signed_binary (n : int) : int list =
+  let x = n land 0xFF in
+  [ (x lsr 7) land 1;
+    (x lsr 6) land 1;
+    (x lsr 5) land 1;
+    (x lsr 4) land 1;
+    (x lsr 3) land 1;
+    (x lsr 2) land 1;
+    (x lsr 1) land 1;
+    x land 1 ]
 
-(* --------------------------------------------------------------------- *)
-(*  Utility: Converting between decimal <-> 8-bit binary (two's complement)*)
-(* --------------------------------------------------------------------- *)
-
-(** 
-  dec_to_bin: Convert a signed integer (-128..127 in two's complement)
-  to an 8-bit list of 0/1. The head of the list is the most significant bit.
+(**
+  signed_binary_to_int: Convert an 8-bit two’s complement list
+  (MSB-first) into an integer in [-128..127].
+  
+  It folds over the list from left (MSB) to right.
 *)
-let dec_to_bin (n : int) : int list =
-  let v = n land 0xFF in
-  let rec build_bits idx acc =
-    if idx < 0 then acc
-    else
-      let bit = (v lsr idx) land 1 in
-      build_bits (idx - 1) (acc @ [bit])
+let signed_binary_to_int (bits : int list) : int =
+  let x = List.fold_left (fun acc b -> (acc lsl 1) lor b) 0 bits in
+  if x >= 128 then x - 256 else x
+
+(**
+  int_to_unsigned_binary: Convert an integer in [0..255]
+  into an 8-bit binary list (MSB-first).
+*)
+let int_to_unsigned_binary (n : int) : int list =
+  let x = n land 0xFF in
+  [ (x lsr 7) land 1;
+    (x lsr 6) land 1;
+    (x lsr 5) land 1;
+    (x lsr 4) land 1;
+    (x lsr 3) land 1;
+    (x lsr 2) land 1;
+    (x lsr 1) land 1;
+    x land 1 ]
+
+(**
+  unsigned_binary_to_int: Convert an 8-bit binary list (MSB-first)
+  into an integer in [0..255].
+*)
+let unsigned_binary_to_int (bits : int list) : int =
+  List.fold_left (fun acc b -> (acc lsl 1) lor b) 0 bits
+
+(****************************************************************)
+(*                        PRINTING BITS                         *)
+(****************************************************************)
+
+(**
+  string_of_bits: Convert a list of bits (MSB-first) into a string.
+  E.g., [0;0;0;0;0;1;0;1] becomes "00000101".
+*)
+let string_of_bits (bits : int list) : string =
+  String.concat "" (List.map (fun b -> if b = 0 then "0" else "1") bits)
+
+let print_binary_8bit label bits =
+  Printf.printf "%s (binary 8-bit): %s\n" label (string_of_bits bits)
+
+(****************************************************************)
+(*                 BINARY ARITHMETIC (8-bit)                    *)
+(****************************************************************)
+
+(**
+  add_8bit: Add two 8-bit signed numbers (MSB-first).
+  
+  To perform addition properly:
+    1. Reverse both lists so that the LSB is first.
+    2. Add bit-by-bit with carry.
+    3. Reverse the result back to MSB-first order.
+    
+  Overflow (in two’s complement) is detected when the sign of the result
+  does not match the signs of the operands (when both operands have the same sign).
+*)
+let add_8bit (a : int list) (b : int list) : (int list * bool) =
+  let a_rev = List.rev a in
+  let b_rev = List.rev b in
+  let rec add_rev a b carry =
+    match (a, b) with
+    | ([], []) -> []  (* We ignore an extra carry; result is 8 bits *)
+    | (ah :: at, bh :: bt) ->
+         let sum = ah + bh + (if carry then 1 else 0) in
+         let bit = sum land 1 in
+         let newcarry = (sum lsr 1) = 1 in
+         bit :: add_rev at bt newcarry
+    | _ -> failwith "Lists must be of equal length"
   in
-  build_bits 7 []
-
-(** 
-  bin_to_dec: Interpret an 8-bit list of 0/1 as a two's complement integer 
-  in range -128..127.
-  Assumes the head of the list is the MSB. 
-*)
-let bin_to_dec (bits : int list) : int =
-  match bits with
-  | [b7; b6; b5; b4; b3; b2; b1; b0] ->
-    (* Combine bits into an integer from 0..255 *)
-    let unsigned_val =
-      (b7 lsl 7) lor (b6 lsl 6) lor (b5 lsl 5) lor (b4 lsl 4)
-      lor (b3 lsl 3) lor (b2 lsl 2) lor (b1 lsl 1) lor (b0 lsl 0)
-    in
-    (* If the top (sign) bit is 1 => interpret as negative => subtract 256 *)
-    if b7 = 1 then unsigned_val - 256 else unsigned_val
-  | _ -> failwith "bin_to_dec requires exactly 8 bits"
-
-(* --------------------------------------------------------------------- *)
-(*  Utility: Converting between hex <-> 8-bit binary (unsigned)          *)
-(* --------------------------------------------------------------------- *)
-
-(** 
-  hex_to_bin: Convert a string in the form "0xAB" to an 8-bit list of bits (unsigned).
-*)
-let hex_to_bin (s : string) : int list =
-  (* Strip "0x" if present, or handle raw hex digits. *)
-  let hex_str =
-    if String.length s >= 2 && String.sub s 0 2 = "0x"
-    then String.sub s 2 (String.length s - 2)
-    else s
+  let result_rev = add_rev a_rev b_rev false in
+  let result = List.rev result_rev in
+  let a_int = signed_binary_to_int a in
+  let b_int = signed_binary_to_int b in
+  let r_int = signed_binary_to_int result in
+  let overflow =
+    (a_int >= 0 && b_int >= 0 && r_int < 0) ||
+    (a_int < 0 && b_int < 0 && r_int >= 0)
   in
-  (* Convert hex string to an integer 0..255 *)
-  let int_val = int_of_string ("0x" ^ hex_str) in
-  (* Build an 8-bit list from int_val (0..255) *)
-  let rec build_bits idx acc =
-    if idx < 0 then acc
-    else
-      let bit = (int_val lsr idx) land 1 in
-      build_bits (idx - 1) (acc @ [bit])
-  in
-  build_bits 7 []
-
-(** 
-  bin_to_hex: Convert an 8-bit list of bits (unsigned) to a hexadecimal string "0x..".
-*)
-let bin_to_hex (bits : int list) : string =
-  match bits with
-  | [b7; b6; b5; b4; b3; b2; b1; b0] ->
-    let value =
-      (b7 lsl 7) lor (b6 lsl 6) lor (b5 lsl 5) lor (b4 lsl 4)
-      lor (b3 lsl 3) lor (b2 lsl 2) lor (b1 lsl 1) lor b0
-    in
-    Printf.sprintf "0x%02X" value
-  | _ -> failwith "bin_to_hex requires exactly 8 bits"
-
-(* --------------------------------------------------------------------- *)
-(*  8-bit Signed Arithmetic (Add / Sub)                                  *)
-(* --------------------------------------------------------------------- *)
-
-(** 
-  add_8bit: adds two 8-bit *signed* values (given as bit-lists), 
-  producing an 8-bit bit-list result (two's complement).
-  We simply convert to int, add, then convert back.
-  Overflow is by wrapping in 8 bits, as typical in 8-bit CPU arithmetic.
-*)
-let add_8bit (a_bits : int list) (b_bits : int list) : int list =
-  let a = bin_to_dec a_bits in
-  let b = bin_to_dec b_bits in
-  let sum = a + b in
-  (* Wrap in 8 bits with two's complement *)
-  dec_to_bin sum
-
-(** 
-  sub_8bit: subtract two 8-bit *signed* values (a - b).
-  We do the same as add, just with negative.
-*)
-let sub_8bit (a_bits : int list) (b_bits : int list) : int list =
-  let a = bin_to_dec a_bits in
-  let b = bin_to_dec b_bits in
-  let diff = a - b in
-  dec_to_bin diff
-
-(* --------------------------------------------------------------------- *)
-(*  8-bit Unsigned Logical Operations                                    *)
-(* --------------------------------------------------------------------- *)
-
-(** 
-   and_8bit: bitwise AND for 8-bit lists (0..255).
-   We interpret them as unsigned, do (land), convert back.
-*)
-let and_8bit (x_bits : int list) (y_bits : int list) : int list =
-  let x = bin_to_dec x_bits in  (* bin_to_dec yields signed -128..127, 
-                                   but we only set bits so effectively 0..255 if MSB=0 *)
-  let x_u = x land 0xFF in
-  let y = bin_to_dec y_bits in
-  let y_u = y land 0xFF in
-  let res = x_u land y_u in
-  dec_to_bin res
-
-(** 
-   or_8bit: bitwise OR (unsigned).
-*)
-let or_8bit (x_bits : int list) (y_bits : int list) : int list =
-  let x_u = (bin_to_dec x_bits) land 0xFF in
-  let y_u = (bin_to_dec y_bits) land 0xFF in
-  dec_to_bin (x_u lor y_u)
-
-(** 
-   xor_8bit: bitwise XOR (unsigned).
-*)
-let xor_8bit (x_bits : int list) (y_bits : int list) : int list =
-  let x_u = (bin_to_dec x_bits) land 0xFF in
-  let y_u = (bin_to_dec y_bits) land 0xFF in
-  dec_to_bin (x_u lxor y_u)
-
-(** 
-   not_8bit: bitwise NOT (unsigned).
-*)
-let not_8bit (x_bits : int list) : int list =
-  let x_u = (bin_to_dec x_bits) land 0xFF in
-  dec_to_bin (lnot x_u land 0xFF)
-
-(* --------------------------------------------------------------------- *)
-(*  Parsing and Evaluating Input                                         *)
-(* --------------------------------------------------------------------- *)
+  (result, overflow)
 
 (**
-  parse_arithmetic: parse an expression like "12 + 5" or "-10 - 3".
-  Returns (left_operand, operator, right_operand) as integers and a char for the operator.
+  sub_8bit: Compute a - b using two’s complement.
+  This is done by negating b (inverting bits and adding 1) and then adding.
 *)
-let parse_arithmetic (line : string) : (int * char * int) =
-  (* Very simplistic parsing:
-     Split by spaces, expect something like: [left; op; right].
-     We do no advanced error checking here.
-  *)
-  let parts = String.split_on_char ' ' line in
-  match parts with
-  | [left_str; op_str; right_str] ->
-    let left_val = int_of_string left_str in
-    let right_val = int_of_string right_str in
-    let op = op_str.[0] in
-    (left_val, op, right_val)
-  | _ ->
-    failwith "Arithmetic parse error: please input like: 12 + 5"
+let sub_8bit (a : int list) (b : int list) : (int list * bool) =
+  let invert bits = List.map (fun x -> if x = 0 then 1 else 0) bits in
+  let (neg_b, _) = add_8bit (invert b) (int_to_unsigned_binary 1) in
+  add_8bit a neg_b
+
+(****************************************************************)
+(*                     BITWISE OPERATIONS                       *)
+(****************************************************************)
 
 (**
-  parse_logic: parse an expression like "0xAA AND 0xFF"
-  Returns (left_hex, operator, right_hex).
-  Or for unary op like "NOT 0xAF", it might parse differently.
+  Bitwise operations work directly on the MSB-first lists.
 *)
-let parse_logic (line : string) : (string * string * string option) =
-  let parts = String.split_on_char ' ' line in
-  match parts with
-  | [op; hex_str] when String.uppercase_ascii op = "NOT" ->
-    (* unary operation: NOT 0x?? *)
-    ("", "NOT", Some hex_str)
-  | [left_hex; op; right_hex] ->
-    (left_hex, String.uppercase_ascii op, Some right_hex)
-  | _ ->
-    failwith "Logic parse error: please input like: 0xAF AND 0x10 or NOT 0xAA"
+let and_8bit (a : int list) (b : int list) : int list =
+  List.map2 (fun x y -> if x = 1 && y = 1 then 1 else 0) a b
 
-(**
-  evaluate_arithmetic: given a line of arithmetic input (e.g. "12 + 5"),
-  produce the decimal string result of the operation.
-*)
-let evaluate_arithmetic (line : string) : string =
-  let (left_val, op, right_val) = parse_arithmetic line in
-  let left_bits = dec_to_bin left_val in
-  let right_bits = dec_to_bin right_val in
-  let result_bits =
-    match op with
-    | '+' -> add_8bit left_bits right_bits
-    | '-' -> sub_8bit left_bits right_bits
-    | _   -> failwith "Unknown arithmetic operator"
-  in
-  let result_val = bin_to_dec result_bits in
-  string_of_int result_val
+let or_8bit (a : int list) (b : int list) : int list =
+  List.map2 (fun x y -> if x = 1 || y = 1 then 1 else 0) a b
 
-(**
-  evaluate_logic: given a line of logic input (e.g. "0xAB AND 0xF0" or "NOT 0xAA"),
-  produce the hex string result.
-*)
-let evaluate_logic (line : string) : string =
-  let (left_hex, op, right_opt) = parse_logic line in
-  match op with
-  | "NOT" ->
-    (match right_opt with
-     | Some hex_str ->
-       let x_bits = hex_to_bin hex_str in
-       bin_to_hex (not_8bit x_bits)
-     | None -> failwith "Missing operand for NOT")
-  | "AND" | "OR" | "XOR" ->
-    (match right_opt with
-     | Some right_hex ->
-       let left_bits = hex_to_bin left_hex in
-       let right_bits = hex_to_bin right_hex in
-       let res_bits = 
-         match op with
-         | "AND" -> and_8bit left_bits right_bits
-         | "OR"  -> or_8bit left_bits right_bits
-         | "XOR" -> xor_8bit left_bits right_bits
-         | _     -> failwith "Impossible"
-       in
-       bin_to_hex res_bits
-     | None -> failwith "Missing right operand for binary logical op")
-  | _ -> failwith "Unknown logical operator"
+let xor_8bit (a : int list) (b : int list) : int list =
+  List.map2 (fun x y -> if x <> y then 1 else 0) a b
 
-(**
-  is_hex_input: tries to detect if the input line is for logical ops (contains "0x" or "AND"/"OR"/"XOR"/"NOT")
-*)
-let is_hex_input (line : string) : bool =
-  let uline = String.uppercase_ascii line in
-  String.contains uline 'X'
-  || (String.contains uline 'A' && (String.length uline < 4 || String.sub uline 0 3 = "AND"))
-  || (String.contains uline 'O' && (String.length uline < 3 || String.sub uline 0 2 = "OR"))
-  || (String.contains uline 'N' && (String.length uline < 4 || String.sub uline 0 3 = "NOT"))
-  || (String.contains uline 'X' && String.contains uline 'O' && String.contains uline 'R')
+let not_8bit (a : int list) : int list =
+  List.map (fun x -> if x = 0 then 1 else 0) a
 
-(**
-  main_loop: a simple recursive read-eval-print. 
-  We do NOT use loops or mutable variables. We use recursion.
-*)
+(****************************************************************)
+(*                    UTILITY: PRINTING, I/O                    *)
+(****************************************************************)
+
+let prompt_string msg =
+  print_string msg;
+  flush stdout;
+  read_line ()
+
+(****************************************************************)
+(*                        MAIN LOGIC                            *)
+(****************************************************************)
+
 let rec main_loop () =
-  print_string "> ";
-  let line = try read_line () with End_of_file -> "" in
-  if line = "" then
-    (* exit the loop on empty input *)
-    print_endline "Goodbye."
-  else 
-    let _ =
-      (* Decide if it's arithmetic or logic and evaluate accordingly. *)
-      let trimmed = String.trim line in
-      if is_hex_input trimmed then
-        let result = evaluate_logic trimmed in
-        Printf.printf "%s\n" result
-      else
-        let result = evaluate_arithmetic trimmed in
-        Printf.printf "%s\n" result
-    in
-    main_loop ()
+  Printf.printf "\nAvailable operations: ADD, SUB, AND, OR, XOR, NOT, QUIT\n";
+  let op = prompt_string "Please specify operation: " in
+  let op = String.uppercase_ascii op in
+  match op with
+  | "QUIT" ->
+      Printf.printf "Exiting the program. Goodbye!\n";
+      exit 0
+  | "ADD" | "SUB" ->
+      let a_str = prompt_string "Enter first operand (decimal in -128..127): " in
+      let b_str = prompt_string "Enter second operand (decimal in -128..127): " in
+      (try
+         let a_int = int_of_string a_str in
+         let b_int = int_of_string b_str in
+         if a_int < -128 || a_int > 127 || b_int < -128 || b_int > 127 then
+           Printf.printf "Error: operands must be in [-128..127].\n"
+         else
+           let a_bits = int_to_signed_binary a_int in
+           let b_bits = int_to_signed_binary b_int in
+           print_binary_8bit "Operand A" a_bits;
+           print_binary_8bit "Operand B" b_bits;
+           let (result_bits, overflow) =
+             if op = "ADD" then add_8bit a_bits b_bits
+             else sub_8bit a_bits b_bits
+           in
+           print_binary_8bit "Result" result_bits;
+           let result_int = signed_binary_to_int result_bits in
+           if overflow then Printf.printf "WARNING: Overflow occurred!\n";
+           Printf.printf "Result in decimal: %d\n" result_int
+       with Failure _ ->
+         Printf.printf "Invalid numeric input. Please try again.\n");
+      main_loop ()
+  | "AND" | "OR" | "XOR" ->
+      let a_str = prompt_string "Enter first operand (hex 00..FF, no '0x' prefix): " in
+      let b_str = prompt_string "Enter second operand (hex 00..FF, no '0x' prefix): " in
+      (try
+         let a_int = int_of_string ("0x" ^ a_str) in
+         let b_int = int_of_string ("0x" ^ b_str) in
+         if a_int < 0 || a_int > 255 || b_int < 0 || b_int > 255 then
+           Printf.printf "Error: hex operands must be in [00..FF].\n"
+         else
+           let a_bits = int_to_unsigned_binary a_int in
+           let b_bits = int_to_unsigned_binary b_int in
+           print_binary_8bit "Operand A" a_bits;
+           print_binary_8bit "Operand B" b_bits;
+           let result_bits =
+             match op with
+             | "AND" -> and_8bit a_bits b_bits
+             | "OR"  -> or_8bit a_bits b_bits
+             | "XOR" -> xor_8bit a_bits b_bits
+             | _ -> failwith "Unexpected operation"
+           in
+           print_binary_8bit "Result" result_bits;
+           let result_int = unsigned_binary_to_int result_bits in
+           Printf.printf "Result in hex: %02X\n" result_int
+       with Failure _ ->
+         Printf.printf "Invalid hex input. Please try again.\n");
+      main_loop ()
+  | "NOT" ->
+      let a_str = prompt_string "Enter operand (hex 00..FF, no '0x' prefix): " in
+      (try
+         let a_int = int_of_string ("0x" ^ a_str) in
+         if a_int < 0 || a_int > 255 then
+           Printf.printf "Error: operand must be in [00..FF].\n"
+         else
+           let a_bits = int_to_unsigned_binary a_int in
+           print_binary_8bit "Operand" a_bits;
+           let result_bits = not_8bit a_bits in
+           print_binary_8bit "Result" result_bits;
+           let result_int = unsigned_binary_to_int result_bits in
+           Printf.printf "Result in hex: %02X\n" result_int
+       with Failure _ ->
+         Printf.printf "Invalid hex input. Please try again.\n");
+      main_loop ()
+  | _ ->
+      Printf.printf "Unknown operation. Please try again.\n";
+      main_loop ()
 
-(* Entry point *)
 let () =
-  print_endline "Simple 8-bit CPU Ops Calculator (type empty line to quit).";
+  Printf.printf "Simple 8-bit CPU Operations (Functional Style in OCaml)\n";
   main_loop ()
