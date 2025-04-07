@@ -50,18 +50,22 @@ swipl
 ```
 ?- consult('queries.pl').
 ```
-This will generate an output file with the results of all the questions answered in sequence.  
+5. Close the Prolog REPL by pressing or typing
+```
+CMT/CTRL + d
+```
+This will generate an output file with the results of all the questions answered in sequence.
 
 **Warning:** You might need to add Prolog to the Path by following the following Instructions
 1. Open VS Code Preferences by using 
 ```
 CMD/CNTRL + SHIFT + P
 ```
-2. Search for 
+1. Search for 
 ```
 Prolog
 ```
-3. Change the Executable Path, for MAC, if you installed it in Applications, to the following:
+1. Change the Executable Path, for MAC, if you installed it in Applications, to the following:
 ```
 /Applications/SWI-Prolog.app/Contents/MacOS
 ```
