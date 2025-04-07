@@ -28,3 +28,26 @@ ocamlc -o binary_arithmetic binary_arithmetic.ml
 ```
 ./binary_arithmetic
 ```
+### Logic Programming Languages (Prolog Airport Scheduling Analysis)  
+Requirements:  
+```
+swi-prolog
+New-VSC-Prolog
+```
+1. Install swi-prolog with  
+```
+brew install swi-prolog
+```
+2. Install the VS Code Prolog extension from the VS Code Marketplace
+```
+New-VSC-Prolog
+```
+3. Open the Prolog REPL using the following command in the terminal
+```
+swipl
+```
+4. Run all the queries batched in the queries file with
+```
+?- consult('queries.pl').
+```
+This will generate an output file with the results of all the questions answered in sequence.
