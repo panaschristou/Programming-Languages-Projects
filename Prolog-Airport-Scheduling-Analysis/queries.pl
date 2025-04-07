@@ -1,6 +1,11 @@
 % queries.pl
 :- consult('rules.pl').
 
+% Optional: If you want to automatically save the output to a file,
+% you can uncomment the following two lines:
+:- tell('output.txt').
+% (and then at the end of the file, add ":- told." to close the output stream.)
+
 % Question 1: Where does the flight from PHX go?
 :- writeln('Question 1: Where does the flight from PHX go?'),
    ( flight(FlightNo, phx, Destination, DepTime, ArrTime),
@@ -44,10 +49,13 @@
    ; true ),
    nl.
 
-% Question 6: What are all the ways to get from LGA to LAX?
+% Question 6: All the ways to get from LGA to LAX with time feasibility (list of flight numbers):
 :- writeln('Question 6: All the ways to get from LGA to LAX (list of flight numbers):'),
-   ( route(lga, lax, Path),
+   ( route_with_time(lga, lax, Path),
      format("  ~w~n", [Path]),
      fail
    ; true ),
    nl.
+
+% Optional: Close the output file if using tell/2 above:
+:- told.

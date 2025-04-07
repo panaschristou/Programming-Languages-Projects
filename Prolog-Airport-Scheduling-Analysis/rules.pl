@@ -1,31 +1,33 @@
 :- consult('flights.pl').
 
 % ------------------------------------------
-% direct_route(X, Y, FlightNo):
-%   Is there a direct flight from X to Y?
+% direct_route(X, Y, FlightNo, DepTime, ArrTime):
+%   Is there a direct flight from X to Y with its departure and arrival times?
 % ------------------------------------------
-direct_route(X, Y, FlightNo) :-
-    flight(FlightNo, X, Y, _, _).
+direct_route(X, Y, FlightNo, DepTime, ArrTime) :-
+    flight(FlightNo, X, Y, DepTime, ArrTime).
 
 % ------------------------------------------
-% route(X, Y, Path):
-%   Finds a sequence of flights from X to Y
-%   (tracking visited airports to avoid loops)
+% route_with_time(X, Y, Path):
+%   Finds a sequence of flights (by flight numbers) from X to Y,
+%   ensuring that for each connection the next flight departs after the previous one lands.
+%   It uses a helper predicate that tracks the visited airports and the previous flight’s arrival time.
 % ------------------------------------------
-route(X, Y, Path) :-
-    route_helper(X, Y, [X], Path).
+route_with_time(X, Y, Path) :-
+    route_time_helper(X, Y, none, [X], Path).
 
 % Base case:
-%   If there is a direct flight from X to Y,
-%   then the path is simply [FlightNo].
-route_helper(X, Y, _, [FlightNo]) :-
-    direct_route(X, Y, FlightNo).
+%   There is a direct flight from X to Y that meets the time constraint.
+%   If PrevArrTime is 'none', it's the first flight; otherwise, the departure time must be later.
+route_time_helper(X, Y, PrevArrTime, _Visited, [FlightNo]) :-
+    direct_route(X, Y, FlightNo, DepTime, _),
+    (PrevArrTime = none ; DepTime @> PrevArrTime).
 
 % Recursive case:
-%   If there is a direct flight from X to Z (F1)
-%   and Z has not yet been visited,
-%   then find a route from Z to Y (recursively).
-route_helper(X, Y, Visited, [F1 | Rest]) :-
-    direct_route(X, Z, F1),
-    \+ member(Z, Visited),          % make sure Z is not already visited
-    route_helper(Z, Y, [Z | Visited], Rest).
+%   Find a flight from X to an intermediate airport Z that departs after PrevArrTime,
+%   ensure Z has not been visited, and then recursively find the route from Z to Y.
+route_time_helper(X, Y, PrevArrTime, Visited, [F1 | Rest]) :-
+    direct_route(X, Z, F1, DepTime, ArrTime),
+    (PrevArrTime = none ; DepTime @> PrevArrTime),
+    \+ member(Z, Visited),  % avoid loops by not revisiting an airport
+    route_time_helper(Z, Y, ArrTime, [Z | Visited], Rest).

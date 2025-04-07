@@ -1,0 +1,22 @@
+Question 1: Where does the flight from PHX go?
+  Flight 954: PHX -> dfw dep 1655 arr 1800
+
+Question 2: Is there a flight to PHX?
+  No, there are no flights to PHX.
+
+Question 3: What time does the flight from BOS land?
+  Arrival time = 1005
+
+Question 4: Does the flight from ORD to SFO depart after the flight from EWR to ORD lands?
+  Yes, it departs after.
+
+Question 5: What time do the flights to ORD arrive?
+  Arrival time = 1005
+  Arrival time = 830
+  Arrival time = 920
+  Arrival time = 945
+
+Question 6: All the ways to get from LGA to LAX (list of flight numbers):
+  [203]
+  [211,2134,1176]
+
