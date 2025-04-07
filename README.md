@@ -6,7 +6,7 @@ Programming languages Projects exploring different programming paradigms.
 To run the projects that are python notebook files on google colab you will need to mount your google drive or upload the data manually.  
 The data was given as a text file so they need to be read in and then converted to JSON format.
 ### Functional Programming Languages (OCaml Binary Arithmetic Terminal)  
-Requirements:  
+**Requirements:**  
 ```
 opam
 ocaml-lsp-server
@@ -29,7 +29,7 @@ ocamlc -o binary_arithmetic binary_arithmetic.ml
 ./binary_arithmetic
 ```
 ### Logic Programming Languages (Prolog Airport Scheduling Analysis)  
-Requirements:  
+**Requirements:**  
 ```
 swi-prolog
 New-VSC-Prolog
@@ -50,4 +50,18 @@ swipl
 ```
 ?- consult('queries.pl').
 ```
-This will generate an output file with the results of all the questions answered in sequence.
+This will generate an output file with the results of all the questions answered in sequence.  
+
+**Warning:** You might need to add Prolog to the Path by following the following Instructions
+1. Open VS Code Preferences by using 
+```
+CMD/CNTRL + SHIFT + P
+```
+2. Search for 
+```
+Prolog
+```
+3. Change the Executable Path, for MAC, if you installed it in Applications, to the following:
+```
+/Applications/SWI-Prolog.app/Contents/MacOS
+```
